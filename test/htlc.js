@@ -60,6 +60,10 @@ contract('HashedTimelock', accounts => {
       contract.preimage,
       '0x0000000000000000000000000000000000000000000000000000000000000000'
     )
+    let senderRep = await htlc.reputation.call(sender)
+    assert.equal(senderRep.valueOf(), 5)
+    let receiverRep = await htlc.reputation.call(receiver)
+    assert.equal(receiverRep.valueOf(), 5)
   })
 
   it('newContract() should fail when no ETH sent', async () => {
@@ -110,6 +114,10 @@ contract('HashedTimelock', accounts => {
     } catch (err) {
       assert.isTrue(err.message.startsWith(REQUIRE_FAILED_MSG))
     }
+    let senderRep = await htlc.reputation.call(sender)
+    assert.equal(senderRep.valueOf().toNumber(), 10)
+    let receiverRep = await htlc.reputation.call(receiver)
+    assert.equal(receiverRep.valueOf().toNumber(), 10)
   })
 
   it('withdraw() should send receiver funds when given the correct secret preimage', async () => {
@@ -148,6 +156,11 @@ contract('HashedTimelock', accounts => {
     assert.isTrue(contract.withdrawn) // withdrawn set
     assert.isFalse(contract.refunded) // refunded still false
     assert.equal(contract.preimage, hashPair.secret)
+    
+    let senderRep = await htlc.reputation.call(sender)
+    assert.equal(senderRep.valueOf().toNumber(), 25)
+    let receiverRep = await htlc.reputation.call(receiver)
+    assert.equal(receiverRep.valueOf().toNumber(), 25)
   })
 
   it('withdraw() should fail if preimage does not hash to hashX', async () => {
@@ -172,6 +185,10 @@ contract('HashedTimelock', accounts => {
     } catch (err) {
       assert.isTrue(err.message.startsWith(REQUIRE_FAILED_MSG))
     }
+    let senderRep = await htlc.reputation.call(sender)
+    assert.equal(senderRep.valueOf().toNumber(), 30)
+    let receiverRep = await htlc.reputation.call(receiver)
+    assert.equal(receiverRep.valueOf().toNumber(), 30)
   })
 
   it('withdraw() should fail if caller is not the receiver', async () => {
@@ -194,6 +211,10 @@ contract('HashedTimelock', accounts => {
     } catch (err) {
       assert.isTrue(err.message.startsWith(REQUIRE_FAILED_MSG))
     }
+    let senderRep = await htlc.reputation.call(sender)
+    assert.equal(senderRep.valueOf().toNumber(), 35)
+    let receiverRep = await htlc.reputation.call(receiver)
+    assert.equal(receiverRep.valueOf().toNumber(), 35)
   })
 
   it('withdraw() should fail after timelock expiry', async () => {
@@ -211,6 +232,11 @@ contract('HashedTimelock', accounts => {
       }
     )
     const contractId = txContractId(newContractTx)
+
+    let senderRep = await htlc.reputation.call(sender)
+    assert.equal(senderRep.valueOf().toNumber(), 5)
+    let receiverRep = await htlc.reputation.call(receiver)
+    assert.equal(receiverRep.valueOf().toNumber(), 5)
 
     // wait one second so we move past the timelock time
     return new Promise((resolve, reject) =>

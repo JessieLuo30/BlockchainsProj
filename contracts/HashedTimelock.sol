@@ -80,18 +80,7 @@ contract HashedTimelock {
 
     mapping (bytes32 => LockContract) contracts;
 
-    mapping (address => int) reputation;
-
-
-    /**
-     * @dev Returns the reputation associated with this wallet.
-     * @param user The address of the wallet to retrieve reputation
-     * @return reputation The reputation of the user based on 
-     *                    previous transactions.
-     */
-    function getReputation(address user) external returns (int reputation) {
-        return reputations[user];
-    }
+    mapping (address => int) public reputation;
 
     /**
      * @dev Sender sets up a new hash time lock contract depositing the ETH and
@@ -122,14 +111,18 @@ contract HashedTimelock {
         );
 
         //If they are creating a useless HTLC, then decrease reputation
-        if (msg.sender == _receiver) 
+        if (msg.sender == _receiver) {
             reputation[msg.sender] -= 100;
+            revert("Cannot create circular HTLC");
+        }
         //If the timelock they request is too long, suspect an attack
-        else if (_timelock - now > 86400) 
+        else if (_timelock - now > 86400) {
             reputation[msg.sender] -= 100;
+            revert("Timelock limit set to 1 day");
+        }
         else {
             reputation[msg.sender] += 5;
-            reputation[_receiver] += 5
+            reputation[_receiver] += 5;
         }
 
         // Reject if a contract already exists with the same parameters. The
@@ -181,6 +174,8 @@ contract HashedTimelock {
         c.preimage = _preimage;
         c.withdrawn = true;
         c.receiver.transfer(c.amount);
+        reputation[c.sender] += 10;
+        reputation[c.receiver] += 10;
         emit LogHTLCWithdraw(_contractId);
         return true;
     }
