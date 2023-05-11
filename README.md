@@ -2,14 +2,11 @@
 
 ## How to start
 * Install dependencies
+npm install
 * Start [Ganache]
+npm run ganache-start
 * Run the tests
-
-$ npm install
-
-$ npm run ganache-start
-
-$ npm run test
+npm run test
 
 ### HashedTimelock
 
