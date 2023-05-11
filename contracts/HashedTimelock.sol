@@ -193,11 +193,15 @@ contract HashedTimelock {
         refundable(_contractId)
         returns (bool)
     {
-        LockContract storage c = contracts[_contractId];
-        c.refunded = true;
-        c.sender.transfer(c.amount);
-        emit LogHTLCRefund(_contractId);
-        return true;
+        if (contracts[_contractId].timelock >= now) {
+            LockContract storage c = contracts[_contractId];
+            c.refunded = true;
+            c.sender.transfer(c.amount);
+            emit LogHTLCRefund(_contractId);
+            return true;
+        }
+        return false;
+            
     }
 
     /**

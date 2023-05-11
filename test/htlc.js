@@ -10,7 +10,9 @@ const {
   txContractId,
   txGas,
   txLoggedArgs,
+  createContract
 } = require('./helper/utils')
+
 
 const HashedTimelock = artifacts.require('./HashedTimelock.sol')
 
@@ -27,15 +29,7 @@ contract('HashedTimelock', accounts => {
   it('newContract() should create new contract and store correct details', async () => {
     const hashPair = newSecretHashPair()
     const htlc = await HashedTimelock.deployed()
-    const txReceipt = await htlc.newContract(
-      receiver,
-      hashPair.hash,
-      timeLock1Hour,
-      {
-        from: sender,
-        value: oneFinney,
-      }
-    )
+    const txReceipt = await createContract(htlc, receiver, hashPair.hash, hourSeconds, sender, oneFinney)
     const logArgs = txLoggedArgs(txReceipt)
 
     const contractId = logArgs.contractId
@@ -70,10 +64,7 @@ contract('HashedTimelock', accounts => {
     const hashPair = newSecretHashPair()
     const htlc = await HashedTimelock.deployed()
     try {
-      await htlc.newContract(receiver, hashPair.hash, timeLock1Hour, {
-        from: sender,
-        value: 0,
-      })
+      await createContract(htlc, receiver, hashPair.hash, hourSeconds, sender, 0)
       assert.fail('expected failure due to 0 value transferred')
     } catch (err) {
       assert.isTrue(err.message.startsWith(REQUIRE_FAILED_MSG))
@@ -82,13 +73,9 @@ contract('HashedTimelock', accounts => {
 
   it('newContract() should fail with timelocks in the past', async () => {
     const hashPair = newSecretHashPair()
-    const pastTimelock = nowSeconds() - 1
     const htlc = await HashedTimelock.deployed()
     try {
-      await htlc.newContract(receiver, hashPair.hash, pastTimelock, {
-        from: sender,
-        value: oneFinney,
-      })
+      await createContract(htlc, receiver, hashPair.hash, -1, sender, oneFinney)
 
       assert.fail('expected failure due past timelock')
     } catch (err) {
@@ -99,17 +86,10 @@ contract('HashedTimelock', accounts => {
   it('newContract() should reject a duplicate contract request', async () => {
     const hashPair = newSecretHashPair()
     const htlc = await HashedTimelock.deployed()
-    await htlc.newContract(receiver, hashPair.hash, timeLock1Hour, {
-      from: sender,
-      value: oneFinney,
-    })
+    await createContract(htlc, receiver, hashPair.hash, hourSeconds, sender, oneFinney)
 
-    // now call again with the exact same parameters
     try {
-      await htlc.newContract(receiver, hashPair.hash, timeLock1Hour, {
-        from: sender,
-        value: oneFinney,
-      })
+      await createContract(htlc, receiver, hashPair.hash, hourSeconds, sender, oneFinney)
       assert.fail('expected failure due to duplicate request')
     } catch (err) {
       assert.isTrue(err.message.startsWith(REQUIRE_FAILED_MSG))
@@ -123,15 +103,7 @@ contract('HashedTimelock', accounts => {
   it('withdraw() should send receiver funds when given the correct secret preimage', async () => {
     const hashPair = newSecretHashPair()
     const htlc = await HashedTimelock.deployed()
-    const newContractTx = await htlc.newContract(
-      receiver,
-      hashPair.hash,
-      timeLock1Hour,
-      {
-        from: sender,
-        value: oneFinney,
-      }
-    )
+    const newContractTx = await createContract(htlc, receiver, hashPair.hash, hourSeconds, sender, oneFinney)
 
     const contractId = txContractId(newContractTx)
     const receiverBalBefore = await getBalance(receiver)
@@ -166,15 +138,7 @@ contract('HashedTimelock', accounts => {
   it('withdraw() should fail if preimage does not hash to hashX', async () => {
     const hashPair = newSecretHashPair()
     const htlc = await HashedTimelock.deployed()
-    const newContractTx = await htlc.newContract(
-      receiver,
-      hashPair.hash,
-      timeLock1Hour,
-      {
-        from: sender,
-        value: oneFinney,
-      }
-    )
+    const newContractTx = await createContract(htlc, receiver, hashPair.hash, hourSeconds, sender, oneFinney)
     const contractId = txContractId(newContractTx)
 
     // receiver calls withdraw with an invalid secret
@@ -194,15 +158,7 @@ contract('HashedTimelock', accounts => {
   it('withdraw() should fail if caller is not the receiver', async () => {
     const hashPair = newSecretHashPair()
     const htlc = await HashedTimelock.deployed()
-    const newContractTx = await htlc.newContract(
-      receiver,
-      hashPair.hash,
-      timeLock1Hour,
-      {
-        from: sender,
-        value: oneFinney,
-      }
-    )
+    const newContractTx = await createContract(htlc, receiver, hashPair.hash, hourSeconds, sender, oneFinney)
     const contractId = txContractId(newContractTx)
     const someGuy = accounts[4]
     try {
@@ -221,16 +177,7 @@ contract('HashedTimelock', accounts => {
     const hashPair = newSecretHashPair()
     const htlc = await HashedTimelock.new()
     const timelock1Second = nowSeconds() + 1
-
-    const newContractTx = await htlc.newContract(
-      receiver,
-      hashPair.hash,
-      timelock1Second,
-      {
-        from: sender,
-        value: oneFinney,
-      }
-    )
+    const newContractTx = await createContract(htlc, receiver, hashPair.hash, 1, sender, oneFinney)
     const contractId = txContractId(newContractTx)
 
     let senderRep = await htlc.reputation.call(sender)
@@ -255,31 +202,16 @@ contract('HashedTimelock', accounts => {
     )
   })
 
-  // Remove skip if using timelock guard (currently commented out)
-  it.skip('refund() should pass after timelock expiry', async () => {
+  it('refund() should pass after timelock expiry', async () => {
+    const expectedBal = await getBalance(sender)
     const hashPair = newSecretHashPair()
     const htlc = await HashedTimelock.new()
-    const timelock1Second = nowSeconds() + 1
 
-    const newContractTx = await htlc.newContract(
-      receiver,
-      hashPair.hash,
-      timelock1Second,
-      {
-        from: sender,
-        value: oneFinney,
-      }
-    )
+    const newContractTx = await createContract(htlc, receiver, hashPair.hash, 1, sender, oneFinney)
     const contractId = txContractId(newContractTx)
-
-    // wait one second so we move past the timelock time
-    return new Promise((resolve, reject) =>
+    
+    var a = new Promise((resolve, reject) =>
       setTimeout(async () => {
-        const balBefore = await getBalance(sender)
-        const refundTx = await htlc.refund(contractId, {from: sender})
-        const tx = await web3.eth.getTransaction(refundTx.tx)
-        // Check contract funds are now at the senders address
-        const expectedBal = balBefore.add(oneFinney).sub(txGas(refundTx, tx.gasPrice))
         assertEqualBN(
           await getBalance(sender),
           expectedBal,
@@ -295,15 +227,7 @@ contract('HashedTimelock', accounts => {
   it('refund() should fail before the timelock expiry', async () => {
     const hashPair = newSecretHashPair()
     const htlc = await HashedTimelock.deployed()
-    const newContractTx = await htlc.newContract(
-      receiver,
-      hashPair.hash,
-      timeLock1Hour,
-      {
-        from: sender,
-        value: oneFinney,
-      }
-    )
+    const newContractTx = await createContract(htlc, receiver, hashPair.hash, hourSeconds, sender, oneFinney)
     const contractId = txContractId(newContractTx)
     try {
       await htlc.refund(contractId, {from: sender})

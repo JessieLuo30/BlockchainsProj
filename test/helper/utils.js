@@ -1,8 +1,5 @@
 const crypto = require('crypto')
 
-// Format required for sending bytes through eth client:
-//  - hex string representation
-//  - prefixed with 0x
 const bufToStr = b => '0x' + b.toString('hex')
 
 const sha256 = x =>
@@ -44,27 +41,32 @@ const htlcArrayToObj = c => {
   }
 }
 
-const htlcERC20ArrayToObj = c => {
-  return {
-    sender: c[0],
-    receiver: c[1],
-    token: c[2],
-    amount: c[3],
-    hashlock: c[4],
-    timelock: c[5],
-    withdrawn: c[6],
-    refunded: c[7],
-    preimage: c[8],
-  }
-}
-
 const getBalance = async (address) => web3.utils.toBN(await web3.eth.getBalance(address))
+
+async function createContract(htlc, receiver, hashlock, seconds, fromv, tov) {
+  const txReceipt = await htlc.newContract(
+    receiver,
+    hashlock,
+    nowSeconds() + seconds,
+    {
+      from: fromv,
+      value: tov,
+    }
+  )
+  new Promise((resolve, reject) =>
+    setTimeout(async () => {
+      const contractId = txContractId(txReceipt)
+      await htlc.refund(contractId, {from: fromv})
+      resolve(1);
+    }, seconds * 1000)
+  )
+  return txReceipt;
+}
 
 module.exports = {
   bufToStr,
   getBalance,
   htlcArrayToObj,
-  htlcERC20ArrayToObj,
   isSha256Hash,
   newSecretHashPair,
   nowSeconds,
@@ -73,4 +75,5 @@ module.exports = {
   txContractId,
   txGas,
   txLoggedArgs,
+  createContract
 }
