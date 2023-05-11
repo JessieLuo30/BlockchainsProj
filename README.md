@@ -1,12 +1,9 @@
 # hashed-timelock-contract-ethereum
 
 ## How to start
-* Install dependencies
-npm install
-* Start [Ganache]
-npm run ganache-start
-* Run the tests
-npm run test
+* Install dependencies -- npm install
+* Start [Ganache] --npm run ganache-start
+* Run the tests -- npm run test
 
 ### HashedTimelock
 
